@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-title" content="Prefatture">
+<title>Prefatture</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{color-scheme:dark}
+body{font-family:-apple-system,sans-serif;margin:0;background:#000;color:#f2f2f7}
+header{background:#111;color:#fff;padding:12px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2;border-bottom:1px solid #2c2c2e}
+header h1{font-size:18px;margin:0;flex:1;text-align:center}
+button{font-size:16px;border:0;border-radius:10px;padding:10px 14px;background:#ffcc00;font-weight:600;color:#000}
+.sec{background:#3a3a3c;color:#fff}.del{background:#ff3b30;color:#fff}
+.wrap{padding:12px;max-width:900px;margin:auto}
+.card{background:#1c1c1e;border-radius:12px;padding:12px;margin-bottom:12px}
+input,select{font-size:16px;padding:10px;border:1px solid #3a3a3c;border-radius:8px;width:100%;box-sizing:border-box;margin-bottom:8px;background:#2c2c2e;color:#fff}
+input::placeholder{color:#8e8e93}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.voce{display:flex;gap:8px;margin:8px 0}.voce input{flex:1;margin:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #2c2c2e;padding:8px 4px;text-align:left;vertical-align:top}
+th{color:#8e8e93}
+.n{text-align:right;white-space:nowrap}
+.nota{color:#ffcc00;font-size:12px}
+.tot{font-weight:700;font-size:18px;text-align:right;margin-top:10px}
+.chip{padding:8px 12px;border-radius:20px;border:3px solid transparent;margin:0 6px 6px 0;color:#fff}
+.chip.on{border-color:#fff}
+.item{display:flex;justify-content:space-between;width:100%;background:#1c1c1e;color:#fff;margin-bottom:8px;padding:14px}
+.hint{color:#8e8e93;font-size:13px;margin:0}
+.hid{display:none}
+</style></head><body>
+
+<div id="login" class="wrap hid"><div class="card">
+<h2>Prefatture</h2>
+<input id="email" type="email" placeholder="Email" autocomplete="username">
+<input id="pw" type="password" placeholder="Password (min 6 caratteri)" autocomplete="current-password">
+<button onclick="login()">Entra</button>
+</div></div>
+
+<div id="home" class="hid">
+<header><button class="sec" onclick="openMonth(shift(mese,-1))">◀</button><h1 id="titMese"></h1><button class="sec" onclick="openMonth(shift(mese,1))">▶</button></header>
+<div class="wrap">
+<div class="card"><b>Inserimento veloce</b>
+<div class="voce"><input id="vHome" placeholder="Tronchetti bolla 12 camion Rossi 350 euro"><button onclick="veloce('vHome',true)">Vai</button></div>
+<p class="hint">Tocca il campo e detta col microfono della tastiera: cliente, bolla, camion, prezzo, "da ... a ...", "nota ...". Poi controlli la riga e tocchi Aggiungi.</p></div>
+<div id="lista"></div>
+<div class="row"><button onclick="nuova('viaggi')">+ Prefattura viaggi</button><button onclick="nuova('epal')">+ Buoni EPAL</button><button class="sec" onclick="$('cam').classList.toggle('hid')">Camion</button></div>
+<div id="cam" class="card hid" style="margin-top:12px">
+<b>Camion</b><div id="listaCam" style="margin:8px 0"></div>
+<div class="g2"><input id="camNome" placeholder="Nome camion"><select id="camCol"><option value="#ff9500">Arancione</option><option value="#ff3b30">Rosso</option><option value="#af52de">Viola</option><option value="#007aff">Blu</option><option value="#34c759">Verde</option></select></div>
+<button onclick="addCam()">Aggiungi camion</button>
+</div></div></div>
+
+<div id="det" class="hid">
+<header><button class="sec" onclick="openMonth(mese)">◀</button><h1 id="titDet"></h1><button onclick="pdf()">PDF</button></header>
+<div class="wrap">
+<div class="card">
+<div class="voce" style="margin-top:0"><input id="vDet" placeholder="Detta: bolla 12 camion Rossi 350 euro"><button onclick="veloce('vDet',false)">Compila</button></div>
+<div class="g2"><input id="fData" type="date"><input id="fDdt" placeholder="N° DDT"></div>
+<div id="fViaggi"><div class="g2"><input id="fPart" placeholder="Partenza"><input id="fDest" placeholder="Destinazione"></div>
+<input id="fPrezzo" placeholder="Prezzo €" inputmode="decimal">
+<input id="fNote" placeholder="Note (es. +50 € sabato)">
+<div id="chips"></div></div>
+<input id="fEpal" class="hid" placeholder="Numero EPAL" inputmode="numeric">
+<div class="row"><button id="bSalva" onclick="salvaRiga()">Aggiungi</button><button id="bAnn" class="sec hid" onclick="pulisci()">Annulla</button><button id="bDelR" class="del hid" onclick="delRiga()">Elimina riga</button></div>
+</div>
+<div class="card"><table><thead id="th"></thead><tbody id="tb"></tbody></table><div class="tot" id="tot"></div></div>
+<button class="del" onclick="delPref()">Elimina prefattura</button>
+</div></div>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCQhf0KJV5Gic0NYGpKnn4wk3p87enh8yY",
+  authDomain: "prefetture-viaggi.firebaseapp.com",
+  projectId: "prefetture-viaggi",
+  storageBucket: "prefetture-viaggi.firebasestorage.app",
+  messagingSenderId: "789844584289",
+  appId: "1:789844584289:web:f48b0070cad5e295650720"
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(),db=firebase.firestore();
+db.enablePersistence().catch(()=>{});
+const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const ME=MESI.map(x=>x.toLowerCase());
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+function oggiMese(){return iso(new Date()).slice(0,7)}
+function oggi(){return iso(new Date())}
+let uid,mese=oggiMese(),camion=[],prefs=[],cur=null,editIdx=-1,selCam=null;
+function shift(m,n){let[y,mm]=m.split('-').map(Number);mm+=n;if(mm<1){mm=12;y--}if(mm>12){mm=1;y++}return y+'-'+pad(mm)}
+function nomeMese(m){const[y,mm]=m.split('-');return MESI[mm-1]+' '+y}
+function show(s){['login','home','det'].forEach(x=>$(x).classList.toggle('hid',x!==s))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function eur(n){return(n||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function dataIt(d){if(!d)return'';const[y,m,g]=d.split('-');return g+'/'+m+'/'+y}
+function num(v){return parseFloat(String(v).replace(',','.'))||0}
+const C=n=>db.collection('utenti').doc(uid).collection(n);
+const tot=p=>(p.righe||[]).reduce((s,r)=>s+(p.tipo==='epal'?(r.epal||0):(r.prezzo||0)),0);
+
+// ACCESSO
+auth.onAuthStateChanged(async u=>{if(!u)return show('login');uid=u.uid;await caricaCamion();openMonth(oggiMese())});
+async function login(){const e=$('email').value.trim(),p=$('pw').value;
+ try{await auth.signInWithEmailAndPassword(e,p)}catch(err){
+  if(confirm('Account non trovato o password errata. Creo un nuovo account con questa email?')){
+   try{await auth.createUserWithEmailAndPassword(e,p)}catch(e2){alert(e2.message)}}}}
+
+// CAMION
+async function caricaCamion(){const s=await C('camion').get();camion=s.docs.map(d=>({id:d.id,...d.data()}));disegnaCamion()}
+function disegnaCamion(){$('listaCam').innerHTML=camion.map(c=>`<div class="row" style="align-items:center;margin-bottom:6px"><span class="chip" style="background:${c.colore}">${esc(c.nome)}</span><button class="sec" onclick="delCam('${c.id}')">Togli</button></div>`).join('')||'Nessun camion'}
+async function addCam(){const nome=$('camNome').value.trim();if(!nome)return;await C('camion').add({nome,colore:$('camCol').value});$('camNome').value='';caricaCamion()}
+async function delCam(id){if(confirm('Togliere questo camion?')){await C('camion').doc(id).delete();caricaCamion()}}
+
+// MESE (a inizio mese copia i clienti del mese prima)
+async function openMonth(m){mese=m;show('home');$('titMese').textContent=nomeMese(m);
+ let s=await C('prefatture').where('mese','==',m).get();
+ if(s.empty&&m===oggiMese()){const flag=await C('mesi').doc(m).get();
+  if(!flag.exists){const prima=await C('prefatture').where('mese','==',shift(m,-1)).get();
+   for(const d of prima.docs){const p=d.data();await C('prefatture').add({cliente:p.cliente,tipo:p.tipo,mese:m,righe:[]})}
+   await C('mesi').doc(m).set({creato:true});s=await C('prefatture').where('mese','==',m).get()}}
+ prefs=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.cliente+a.tipo).localeCompare(b.cliente+b.tipo));
+ $('lista').innerHTML=prefs.map((p,i)=>`<button class="item" onclick="apri(${i})"><span>${p.tipo==='epal'?'Buoni EPAL – ':''}${esc(p.cliente)}</span><span>${p.tipo==='epal'?tot(p)+' EPAL':'€ '+eur(tot(p))}</span></button>`).join('')||'<p>Nessuna prefattura per questo mese.</p>'}
+async function nuova(tipo){const c=prompt(tipo==='epal'?'Buoni EPAL: per quale cliente?':'Nome del cliente:',tipo==='epal'?'Tronchetti':'');if(!c)return;
+ await C('prefatture').add({cliente:c.trim(),tipo,mese,righe:[]});openMonth(mese)}
+
+// PREFATTURA
+function apri(i){cur=prefs[i];show('det');const ep=cur.tipo==='epal';
+ $('titDet').textContent=(ep?'EPAL ':'')+cur.cliente;
+ $('fViaggi').classList.toggle('hid',ep);$('fEpal').classList.toggle('hid',!ep);
+ $('th').innerHTML=ep?'<tr><th>Data</th><th>DDT</th><th class="n">EPAL</th><th class="n">Euro</th></tr>':'<tr><th>Data</th><th>DDT</th><th>Partenza</th><th>Destinazione</th><th class="n">Prezzo</th><th>Note</th></tr>';
+ selCam=null;pulisci();$('fData').value=cur.mese===oggiMese()?oggi():cur.mese+'-01';disegna()}
+function chips(){$('chips').innerHTML=[{id:'',nome:'Io',colore:'#8e8e93'},...camion].map(c=>`<button class="chip ${(selCam||'')===c.id?'on':''}" style="background:${c.colore}" onclick="selCam='${c.id}'||null;chips()">${esc(c.nome)}</button>`).join('')}
+function disegna(){const ep=cur.tipo==='epal';const r=cur.righe=cur.righe||[];
+ r.sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+ $('tb').innerHTML=r.map((x,i)=>`<tr onclick="modifica(${i})"><td style="${x.colore?'background:'+x.colore+';color:#fff':''}">${dataIt(x.data)}</td><td>${esc(x.ddt)}</td>${ep?`<td class="n">${x.epal}</td><td class="n">${eur(x.epal)}</td>`:`<td>${esc(x.partenza)}</td><td>${esc(x.destinazione)}</td><td class="n">${eur(x.prezzo)}</td><td class="nota">${esc(x.note)}</td>`}</tr>`).join('');
+ $('tot').textContent=ep?`Totale: ${tot(cur)} EPAL = € ${eur(tot(cur))}`:`Totale: € ${eur(tot(cur))}`}
+function pulisci(){editIdx=-1;['fDdt','fPart','fDest','fPrezzo','fNote','fEpal'].forEach(f=>$(f).value='');$('bSalva').textContent='Aggiungi';$('bAnn').classList.add('hid');$('bDelR').classList.add('hid');chips()}
+function modifica(i){const x=cur.righe[i];editIdx=i;$('fData').value=x.data;$('fDdt').value=x.ddt;
+ if(cur.tipo==='epal')$('fEpal').value=x.epal;else{$('fPart').value=x.partenza;$('fDest').value=x.destinazione;$('fPrezzo').value=String(x.prezzo).replace('.',',');$('fNote').value=x.note||'';selCam=x.camion||null}
+ $('bSalva').textContent='Salva modifica';$('bAnn').classList.remove('hid');$('bDelR').classList.remove('hid');chips();scrollTo(0,0)}
+function salvaRiga(){const ep=cur.tipo==='epal',nuovaR=editIdx<0;const x={data:$('fData').value,ddt:$('fDdt').value.trim()};
+ if(!x.data)return alert('Manca la data');
+ if(ep){x.epal=parseInt($('fEpal').value)||0;if(!x.epal)return alert('Inserisci il numero di EPAL')}
+ else{const c=camion.find(c=>c.id===selCam);Object.assign(x,{partenza:$('fPart').value.trim(),destinazione:$('fDest').value.trim(),prezzo:num($('fPrezzo').value),note:$('fNote').value.trim(),camion:selCam||null,colore:c?c.colore:null})}
+ if(nuovaR)cur.righe.push(x);else cur.righe[editIdx]=x;
+ salva();const p=$('fPart').value;pulisci();if(nuovaR)$('fPart').value=p;disegna()}
+function delRiga(){if(!confirm('Eliminare questa riga?'))return;cur.righe.splice(editIdx,1);salva();pulisci();disegna()}
+function salva(){C('prefatture').doc(cur.id).update({righe:cur.righe}).catch(e=>alert('Errore salvataggio: '+e.message))}
+function delPref(){if(!confirm('Eliminare tutta la prefattura '+cur.cliente+'?'))return;C('prefatture').doc(cur.id).delete();openMonth(mese)}
+
+// INSERIMENTO VELOCE (dettatura della tastiera)
+const cap=s=>s.trim().replace(/\s+/g,' ').replace(/(^|\s)\S/g,c=>c.toUpperCase());
+function capisci(t){const r={};let m;
+ m=t.match(/\bnot[ae]\b\s*:?\s*(.+)$/i);if(m){r.note=m[1].trim();t=t.slice(0,m.index)}
+ let s=' '+t.toLowerCase().replace(/€\s*(\d+(?:[.,]\d{1,2})?)/g,' $1 euro ').replace(/€/g,' euro ').replace(/,(?!\d)/g,' ').replace(/[;:!?]/g,' ').replace(/\.(?!\d)/g,' ').replace(/\s+/g,' ')+' ';
+ const via=x=>{s=s.replace(x,' ').replace(/\s+/g,' ')};
+ m=s.match(/\s(?:bolla|ddt|documento)\s(?:n\s|nr\s|numero\s)?([a-z0-9\/-]*\d[a-z0-9\/-]*)\s/);if(m){r.ddt=m[1];via(m[0])}
+ m=s.match(/\s(\d+)\s(?:epal|bancali|pallet)\s/)||s.match(/\s(?:epal|bancali|pallet)\s(\d+)\s/);if(m){r.epal=parseInt(m[1]);via(m[0])}
+ m=s.match(/\s(\d+(?:[.,]\d{1,2})?)\seuro\s/)||s.match(/\seuro\s(\d+(?:[.,]\d{1,2})?)\s/)||s.match(/\sprezzo\s(?:di\s)?(\d+(?:[.,]\d{1,2})?)\s/);if(m){r.prezzo=num(m[1]);via(m[0])}
+ const d=new Date();
+ if(/\sieri\s/.test(s)){d.setDate(d.getDate()-1);r.data=iso(d)}
+ else if(m=s.match(new RegExp('\\s(\\d{1,2})\\s('+ME.join('|')+')\\s'))){d.setMonth(ME.indexOf(m[2]),parseInt(m[1]));r.data=iso(d);via(m[0])}
+ else if(m=s.match(/\s(?:il|del|giorno)\s(\d{1,2})\s/)){d.setDate(parseInt(m[1]));r.data=iso(d);via(m[0])}
+ const cm=[...camion].sort((a,b)=>b.nome.length-a.nome.length).find(c=>s.includes(' '+c.nome.toLowerCase()+' '));
+ if(cm){r.camion=cm.id;via(' '+cm.nome.toLowerCase()+' ')}
+ const cl=prefs.filter(p=>r.epal?p.tipo==='epal':p.tipo!=='epal').sort((a,b)=>b.cliente.length-a.cliente.length).find(p=>s.includes(' '+p.cliente.toLowerCase()+' '));
+ if(cl){r.pref=cl;via(' '+cl.cliente.toLowerCase()+' ')}
+ s=s.replace(/\s+/g,' ');
+ m=s.match(/\sda\s(.+?)\s(?:a|ad|per)\s(.+?)(?=\s(?:con|col|camion|bolla|ddt|prezzo|euro|il|del|fatto)\s|\s$)/);
+ if(m){r.partenza=cap(m[1]);r.destinazione=cap(m[2])}
+ return r}
+function veloce(id,home){const t=$(id).value.trim();if(!t)return;const r=capisci(t);
+ if(home){if(!r.pref)return alert("Non trovo il cliente: di' il nome come è scritto nella lista del mese");apri(prefs.indexOf(r.pref))}
+ compila(r);$(id).value=''}
+function compila(r){if(r.data)$('fData').value=r.data;if(r.ddt)$('fDdt').value=r.ddt;
+ if(cur.tipo==='epal'){if(r.epal)$('fEpal').value=r.epal}
+ else{if(r.partenza)$('fPart').value=r.partenza;if(r.destinazione)$('fDest').value=r.destinazione;
+  if(r.prezzo)$('fPrezzo').value=String(r.prezzo).replace('.',',');if(r.note)$('fNote').value=r.note;
+  if(r.camion){selCam=r.camion;chips()}}
+ $('bSalva').scrollIntoView({block:'center'})}
+
+// PDF (bianco, con le note)
+function pdf(){const{jsPDF}=window.jspdf;const d=new jsPDF();const ep=cur.tipo==='epal';const r=cur.righe||[];
+ const pul=s=>String(s??'').replace(/€/g,'EUR');
+ const tit=(ep?'Buoni EPAL ':'')+cur.cliente+' - '+nomeMese(cur.mese);
+ d.setFontSize(14);d.text(tit,14,15);
+ d.autoTable({startY:22,
+  head:[ep?['Data','DDT','N. EPAL','Euro']:['Data','DDT','Partenza','Destinazione','Prezzo','Note']],
+  body:r.map(x=>ep?[dataIt(x.data),pul(x.ddt),x.epal,eur(x.epal)]:[dataIt(x.data),pul(x.ddt),pul(x.partenza),pul(x.destinazione),eur(x.prezzo),pul(x.note)]),
+  foot:[ep?['','Totale',tot(cur),eur(tot(cur))+' EUR']:['','','','Totale',eur(tot(cur))+' EUR','']],
+  headStyles:{fillColor:[60,60,60]},footStyles:{fillColor:[230,230,230],textColor:0},
+  columnStyles:ep?{2:{halign:'right'},3:{halign:'right'}}:{4:{halign:'right'}},
+  didParseCell:h=>{if(h.section==='body'&&h.column.index===0&&!ep&&r[h.row.index].colore){h.cell.styles.fillColor=r[h.row.index].colore;h.cell.styles.textColor=255}}});
+ const nome=tit.split(' ').join('_')+'.pdf';const f=new File([d.output('blob')],nome,{type:'application/pdf'});
+ if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(()=>{});else d.save(nome)}
+</script>
+</body></html>
